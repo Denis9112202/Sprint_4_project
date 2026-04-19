@@ -13,8 +13,4 @@ config = {
 
     # Сохранение модели
     'save_path': 'best_model.pth',
-
-    # Метрики для отслеживания
-    'target_metric': 'MAE',
-    'target_threshold': 50  # Целевое значение MAE < 50 ккал
 }
