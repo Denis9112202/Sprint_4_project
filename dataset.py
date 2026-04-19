@@ -20,32 +20,26 @@ class FoodDataset(Dataset):
     def __getitem__(self, idx):
         row = self.dish_df.iloc[idx]
         dish_id = row['dish_id']
-
-        # Загрузка изображения
         img_path = os.path.join(self.images_dir, str(dish_id), 'rgb.png')
         image = Image.open(img_path).convert('RGB')
 
         if self.transform:
             image = self.transform(image)
 
-        # Обработка ингредиентов
         ingredients_str = row['ingredients']
         if pd.isna(ingredients_str):
             ingredients_ids = []
         else:
             ingredients_ids = [int(x.split('_')[-1]) for x in ingredients_str.split(';')]
 
-        # One-hot encoding ингредиентов
         num_ingredients = len(self.ingredients_df)
         ingredients_vector = np.zeros(num_ingredients)
         for ingr_id in ingredients_ids:
             if ingr_id < num_ingredients:
                 ingredients_vector[ingr_id] = 1
 
-        # Нормализация массы с использованием переданного скалера
         mass = self.scaler.transform([[row['total_mass']]])[0, 0]
 
-        # Целевая переменная
         calories = row['total_calories']
 
         return {
@@ -57,7 +51,6 @@ class FoodDataset(Dataset):
         }
 
 def get_transforms(train=True):
-    """Получение трансформаций для данных"""
     if train:
         return transforms.Compose([
             transforms.Resize((224, 224)),
