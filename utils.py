@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import random
 import matplotlib.pyplot as plt
+from torchvision.models import resnet18
 from PIL import Image
 from sklearn.preprocessing import StandardScaler
 from scripts.dataset import FoodDataset, get_transforms
@@ -22,7 +23,6 @@ def set_seed(seed=42):
 class MultiModalModel(nn.Module):
     def __init__(self, num_ingredients):
         super(MultiModalModel, self).__init__()
-        from torchvision.models import resnet18
         self.cnn = resnet18(pretrained=True)
         self.cnn.fc = nn.Linear(self.cnn.fc.in_features, 512)
 
@@ -127,7 +127,6 @@ def validate_model(config, model=None):
 
     ingredient_id_to_name = dict(zip(ingredients_df['id'], ingredients_df['ingr']))
 
-    # Создаём словарь dish_id → список названий ингредиентов
     dish_to_ingredients = {}
     for _, row in dish_df.iterrows():
         dish_id = row['dish_id']
@@ -182,7 +181,7 @@ def validate_model(config, model=None):
             image = batch['image'].to(device)
             ingredients = batch['ingredients'].to(device)
             mass = batch['mass'].to(device)
-            targets = batch['calories'].to(device)  # Целевые значения
+            targets = batch['calories'].to(device)
             dish_ids = batch.get('dish_id', [None] * len(targets))
             outputs = model(image, ingredients, mass)
 
@@ -227,7 +226,6 @@ def validate_model(config, model=None):
             'error': error
         })
 
-    # Вывод изображений для топ‑5 худших примеров
     print("\n" + "="*60)
     print("ИЗОБРАЖЕНИЯ ДЛЯ ТОП‑5 НАИМЕНЕЕ ТОЧНЫХ ПРЕДСКАЗАНИЙ")
     print("="*60)
