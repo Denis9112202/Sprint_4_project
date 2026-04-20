@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 import random
 import matplotlib.pyplot as plt
-from torchvision.models import resnet18
 from PIL import Image
 from sklearn.preprocessing import StandardScaler
 from scripts.dataset import FoodDataset, get_transforms
@@ -21,21 +20,22 @@ def set_seed(seed=42):
     torch.backends.cudnn.benchmark = False
 
 class MultiModalModel(nn.Module):
-    def __init__(self, num_ingredients):
+    def __init__(self, num_ingredients, config):
         super(MultiModalModel, self).__init__()
+        from torchvision.models import resnet18
         self.cnn = resnet18(pretrained=True)
         self.cnn.fc = nn.Linear(self.cnn.fc.in_features, 512)
 
         self.ingr_fc = nn.Sequential(
             nn.Linear(num_ingredients, 256),
             nn.ReLU(),
-            nn.Dropout(0.3)
+            nn.Dropout(config['dropout_rate_ingr'])
         )
 
         self.final_fc = nn.Sequential(
             nn.Linear(512 + 256 + 1, 256),
             nn.ReLU(),
-            nn.Dropout(0.3),
+            nn.Dropout(config['dropout_rate_final']),
             nn.Linear(256, 1)
         )
 
@@ -65,12 +65,12 @@ def train(config):
     train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True, num_workers=4)
     val_loader = DataLoader(val_dataset, batch_size=config['batch_size'], shuffle=False, num_workers=4)
 
-    model = MultiModalModel(len(ingredients_df))
+    model = MultiModalModel(len(ingredients_df),config)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=config['learning_rate'])
-    criterion = nn.L1Loss() 
+    criterion = nn.SmoothL1Loss() 
 
     best_mae = float('inf')
 
@@ -127,6 +127,7 @@ def validate_model(config, model=None):
 
     ingredient_id_to_name = dict(zip(ingredients_df['id'], ingredients_df['ingr']))
 
+    # Создаём словарь dish_id → список названий ингредиентов
     dish_to_ingredients = {}
     for _, row in dish_df.iterrows():
         dish_id = row['dish_id']
@@ -166,7 +167,7 @@ def validate_model(config, model=None):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     if model is None:
-        model = MultiModalModel(len(ingredients_df))
+        model = MultiModalModel(len(ingredients_df),config)
         model.load_state_dict(torch.load(config['save_path'], map_location=device))
     model.to(device)
     model.eval()
@@ -181,7 +182,7 @@ def validate_model(config, model=None):
             image = batch['image'].to(device)
             ingredients = batch['ingredients'].to(device)
             mass = batch['mass'].to(device)
-            targets = batch['calories'].to(device)
+            targets = batch['calories'].to(device)  # Целевые значения
             dish_ids = batch.get('dish_id', [None] * len(targets))
             outputs = model(image, ingredients, mass)
 
@@ -226,6 +227,7 @@ def validate_model(config, model=None):
             'error': error
         })
 
+    # Вывод изображений для топ‑5 худших примеров
     print("\n" + "="*60)
     print("ИЗОБРАЖЕНИЯ ДЛЯ ТОП‑5 НАИМЕНЕЕ ТОЧНЫХ ПРЕДСКАЗАНИЙ")
     print("="*60)
